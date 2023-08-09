@@ -1,6 +1,6 @@
 # ConnectivityXchange: Powered by ZeeVee
 
-Welcome to ConnectivityXchange, a revolutionary program developed by ZeeVee that seamlessly connects our cutting-edge system with third-party automation controllers. This README provides important information on how to use, modify, and contribute to ConnectivityXchange.
+Welcome to ConnectivityXchange, an industry-first initiative by ZeeVee, that connects our industry-leading AV over IP technology with third-party automation systems through collaborative plugin development. This README provides important information on how to use, modify, and contribute to this collaboration.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ Welcome to ConnectivityXchange, a revolutionary program developed by ZeeVee that
 
 ## About
 
-ConnectivityXchange is designed to empower AV integrators to seamlessly incorporate ZeeVee's solutions into various setups, regardless of the control system in use. It aims to provide flexibility and choice while fostering a collaborative community.
+ConnectivityXchange is designed to empower AV integrators to seamlessly incorporate ZeeVee's solutions into multiple environments, regardless of the control system. We aim to provide flexibility and choice while driving success for all. This reflects our commitment to working with any control system from any manufacturer.
 
 ## Getting Started
 
@@ -31,7 +31,7 @@ ConnectivityXchange encourages AV enthusiasts to modify the code to better suit 
 
 We welcome and value your contributions to improve ConnectivityXchange. If you've developed improvements, bug fixes, or new features, feel free to submit a pull request. Our team will review your changes and, upon acceptance, incorporate them into the main code. We're committed to acknowledging your contributions, and as a token of our gratitude, we'll immortalize your name in the credits as a contributor.
 
-For guidelines on how to contribute, please refer to our [Contribution Guide](CONTRIBUTING.md).
+For guidelines on how to contribute, please refer to our [Contribution Guide](docs/contribution-guide.md).
 
 ## License
 
@@ -41,5 +41,4 @@ ConnectivityXchange is distributed under the terms of the [GPL-3.0 License](LICE
 
 Thank you for choosing ConnectivityXchange. We're excited to embark on this collaborative journey with you. Feel free to reach out to us if you have any questions or need assistance.
 
-Antony Torres <atorres@zeevee.com>
-Art Weeks <aweeks@zeevee.com>
+ConnectivityXchange Team <git@zeevee.com>
