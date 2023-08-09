@@ -6,7 +6,6 @@ Welcome to ConnectivityXchange, an industry-first initiative by ZeeVee, that con
 
 - [About](#about)
 - [Getting Started](#getting-started)
-- [Usage](#usage)
 - [Modifying the Code](#modifying-the-code)
 - [Contributing](#contributing)
 - [License](#license)
