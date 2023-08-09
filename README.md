@@ -41,5 +41,4 @@ ConnectivityXchange is distributed under the terms of the [GPL-3.0 License](LICE
 
 Thank you for choosing ConnectivityXchange. We're excited to embark on this collaborative journey with you. Feel free to reach out to us if you have any questions or need assistance.
 
-Antony Torres <atorres@zeevee.com>
-Art Weeks <aweeks@zeevee.com>
+ConnectivityXchange Team <git@zeevee.com>
