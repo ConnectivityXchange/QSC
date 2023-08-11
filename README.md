@@ -16,7 +16,7 @@ ConnectivityXchange is designed to empower AV integrators to seamlessly incorpor
 
 ## Getting Started
 
-To get started, simply clone this repository to your local environment. The codebase is licensed under the GPL-3.0 license, which means you are free to use, modify, and distribute the software as long as your use remains non-profit. For more details, please refer to the [LICENSE](LICENSE) file.
+To get started, simply clone this repository to your local environment. The codebase is licensed under the GPL-3.0 license, which means you are free to use, modify, and distribute the software. For more details, please refer to the [LICENSE](LICENSE) file.
 
 ## Modifying the Code
 
