@@ -1204,7 +1204,7 @@ function ZEEVEE.INIT()
 				if(Controls["Join_Output_"..output.."_Multiview_"..multiview] ~= nil) then
 					Controls["Join_Output_"..output.."_Multiview_"..multiview].EventHandler = function()
 						local cmd = "join " .. Controls.multiviewNames[multiview].String .." ".. Controls.displayName[output].String .. " multiview"
-						DEBUG.TX("Sending Zone Join Command: " .. cmd)
+						DEBUG.TX("Sending Multiview Join Command: " .. cmd)
 						HttpClient.Upload {
 							Url = ZEEVEE.ENDPOINT,
 							Method = "POST",
@@ -1222,7 +1222,7 @@ function ZEEVEE.INIT()
 						local encoderName = Controls.sourceName[encoderNum].String
 						local squareToChange = "multiview " .. Controls.multiviewNames[multiview].String .. " windowNumber " .. window
 						local cmd = "set ".. squareToChange .. " " .. encoderName
-						DEBUG.TX("Sending Zone Join Command: " .. cmd)
+						DEBUG.TX("Sending Multiview Window Set Command: " .. cmd)
 						HttpClient.Upload {
 							Url = ZEEVEE.ENDPOINT,
 							Method = "POST",
