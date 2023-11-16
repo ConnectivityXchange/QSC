@@ -1,12 +1,14 @@
 -----------------------------------------------------------------
 -- ZeeVee Zyper Management Platform Plugin for QSC Q-SYS
+-- Modified by Ian Campbell
 -- Developed by Chowmain Software & Apps
 -- http://www.chowmainsoft.com
 --
--- Revision Dated: 2023-MAY-12
+-- Revision Dated: 2023-NOV-16
 -- Version Number: 1.1 build 0.0.0.5
 --
 -- Changelog:
+-- 2023-NOV-16 - Added more Multiview functionality
 -- 2023-MAY-12 - Fixed issue with one-way commands not sending for matrixes more than 1x1
 -- 2023-JAN-06 - Certification RC4 - moved ip address from properties to setup page
 -- 2023-JAN-04 - Certification RC3
@@ -21,7 +23,7 @@ COLOR = {
 PluginInfo =
 {
   Name = "ZeeVee~Zyper Management Platform Plugin",
-  Version = "1.2",
+  Version = "1.3",
   BuildVersion = "0.0.0.1",
   Id = "8111977b-91d9-4ef4-8c51-e57ca99c67ef",
   Description = "Plugin to interface ZeeVee Zyper Management Platform running Firmware Version 2.0 and above",
@@ -140,9 +142,16 @@ function GetProperties()
 		{
 		  Name = "Number of zones",
 		  Type = "integer",
-		  Min  = 0,
+		  Min  = 1,
 		  Max = 100,
-		  Value = PluginInfo.devEnvironment == true and 1 or 0
+		  Value = PluginInfo.devEnvironment == true and 1 or 1
+		},
+		{
+		  Name = "Number of multiviews",
+		  Type = "integer",
+		  Min = 1,
+		  Max = 100,
+		  Value = PluginInfo.devEnvironment == true and 1 or 1
 		},
 		{
 		  Name = "Debug Print",
@@ -216,6 +225,12 @@ function GetControls(props)
 	  UserPin = true,
 	  PinStyle = "Both",
 	},
+	{
+		Name = "multiviewNames",
+		ControlType = "Text",
+		UserPin = false,
+		Count = props["Number of multiviews"].Value,
+	},
     {
       Name = "videowallEncoder",
       ControlType = "Text",
@@ -287,6 +302,7 @@ function GetControls(props)
     local z = tonumber(props["Number of zones"].Value)
     local d = tonumber(props["Number of decoders"].Value)
     local e = tonumber(props["Number of encoders"].Value)
+	local m = tonumber(props["Number of multiviews"].Value)
     for a=1,d,1 do
 		local t = {
 			  Name = "Send_Output_" .. a .. "_RS232",
@@ -342,6 +358,17 @@ function GetControls(props)
 					}
 				table.insert(c,t)
 			end
+			for b=1,m,1 do -- Add multiview routing buttons to entire list
+				local t = {
+					Name = "Join_Output_"..a.."_Multiview_"..b,
+					ControlType = "Button",
+					ButtonType = "Toggle",
+					Count = 1,
+					UserPin = true,
+					PinStyle = "Both",
+				}
+				table.insert(c,t)
+			end
 		end
     end
     if z > 0 then
@@ -376,6 +403,18 @@ function GetControls(props)
 			  PinStyle = "Both",
 			}
 		table.insert(c,t)
+	end
+	for a=1,m,1 do
+		for b=1,6,1 do
+			local t = { -- Add control to configure individual multiview dynamically
+				Name = "Join_Multiview_"..a.."_Window_"..b,
+				ControlType = "Text",
+				Count = 1,
+				UserPin = true,
+				PinStyle = "Both",
+			}
+			table.insert(c,t)
+		end
 	end
   return c
 end
@@ -497,6 +536,7 @@ local layout, graphics = {},{}
 		}
 	end
   elseif(CurrentPage=="Multiview") then
+	local m = tonumber(props["Number of multiviews"].Value)
 	table.insert(graphics,{
 			Type = "Text",
 			Text = "Multiview Name:",
@@ -533,6 +573,49 @@ local layout, graphics = {},{}
 		Position = { 210, 0},
 		Size = { 80, 38 },
 	}
+	table.insert(graphics,{ --add a box just below
+		Type = "GroupBox",
+		Text = "Window Routes",
+		HTextAlign = "Left",
+		StrokeWidth = 1,
+		CornerRadius = 8,
+		Position = { 50, 40 },
+		Size = { 60 + (40 *(6)), 60 + (20 *(m))},
+	})
+	table.insert(graphics,{
+		Type = "Text",
+		Text = "Multiv",
+		Position = { 0, 75},
+		HTextAlign = "Center",
+		Size = { 50, 10 },
+	})
+	for a=1,6 do
+		table.insert(graphics,{ --add window numbers for context
+			Type = "Text",
+			Text = tostring(a),
+			Position = { 65 + (40 *(a-1)), 75},
+			HTextAlign = "Center",
+			Size = { 30, 10 },
+		})
+	end
+	for a=1,m,1 do
+		table.insert(graphics,{ --add multiview numbers for context
+			Type = "Text",
+			Text = tostring(a),
+			Position = { 0,95+(20*(a-1))},
+			HTextAlign = "Center",
+			Size = { 30, 10 },
+		})
+		for b=1,6,1 do --add multiview routing to UI
+			layout["Join_Multiview_"..a.."_Window_" .. b] =
+			{
+				PrettyName = string.format("Multiview~MV_%i_Window_%i",a,b), -- The Tilde (~) creates a folder break for the Control Pin list
+				Style = "Text",
+				Position = { 60 + (40 *(b-1)), 90 + (20 *(a-1)) },
+				Size = { 40, 18 },
+			}
+		end
+	end
   elseif(CurrentPage=="Videowall") then
 	table.insert(graphics,{
 			Type = "Text",
@@ -574,6 +657,7 @@ local layout, graphics = {},{}
     local d = tonumber(props["Number of decoders"].Value)
     local e = tonumber(props["Number of encoders"].Value)
     local z = tonumber(props["Number of zones"].Value)
+	local m = tonumber(props["Number of multiviews"].Value)
 		table.insert(graphics,{
 			Type = "GroupBox",
 			Text = "Decoder",
@@ -581,14 +665,21 @@ local layout, graphics = {},{}
 			StrokeWidth = 1,
 			CornerRadius = 8,
 			Position = { 50, 0 },
-			Size = { 60 + (40 *(d-1)), 90 + (20 *(e-1))},
+			Size = { 60 + (40 *(d-1)), 120 + (20 *(e-1))+(20*(m-1))}, --the box is larger to contain multiview as inputs
 		  })
-		table.insert(graphics,{
-				Type = "Text",
-				Text = "Encoder",
-				Position = { 0, 45},
-				HTextAlign = "Center",
-				Size = { 50, 10 },
+		  table.insert(graphics,{
+				  Type = "Text",
+				  Text = "Encoder",
+				  Position = { 0, 45},
+				  HTextAlign = "Center",
+				  Size = { 50, 10 },
+			})
+			table.insert(graphics,{
+					Type = "Text",
+					Text = "Multiv",
+					Position = { 0, 80+ (20 *(e-1))},
+					HTextAlign = "Center",
+					Size = { 50, 10 },
 			})
 	if(z > 0) then
 		table.insert(graphics,{
@@ -597,7 +688,7 @@ local layout, graphics = {},{}
 			HTextAlign = "Left",
 			StrokeWidth = 1,
 			CornerRadius = 8,
-			Position = { 50, 100 + (20 *(e-1)) },
+			Position = { 50, 130 + (20 *(e-1))+(20*(m-1)) },
 			Size = { 60 + (40 *(z-1)), 70 + (20 *(e-1))},
 		  })
 		table.insert(graphics,{
@@ -610,7 +701,7 @@ local layout, graphics = {},{}
 		table.insert(graphics,{
 				Type = "Text",
 				Text = "Encoder",
-				Position = { 0,105 + (20 *(e))},
+				Position = { 0,135 + (20 *(e))+(20*(m-1))},
 				HTextAlign = "Center",
 				Size = { 50, 10 },
 			})
@@ -619,16 +710,16 @@ local layout, graphics = {},{}
 					Type = "Text",
 					Text = tostring(a),
 					--Position = { 65 + (40 *(a-1)), 125 + (60 *(e-1))},
-					Position = { 65 + (40 *(a-1)), 105 + (20 *(e))},
+					Position = { 65 + (40 *(a-1)), 135 + (20 *(e))+(20*(m-1))},
 					HTextAlign = "Center",
 					Size = { 30, 10 },
 				})
 			for b=1,e do
 				layout["Join_Zone_" .. a .. "_Input_" .. b] =
 				{
-					PrettyName = string.format("Join~Zone_%i__Input_%i",a,b), -- The Tilde (~) creates a folder break for the Control Pin list
+					PrettyName = string.format("Join~Zone_%i_Input_%i",a,b), -- The Tilde (~) creates a folder break for the Control Pin list
 					Style = "Button",
-					Position = { 60 + (40 *(a-1)), (20 *(e-1)) + 140 + (20 *(b-1)) },
+					Position = { 60 + (40 *(a-1)), (20 *(e-1)) + 170 + (20 *(b-1)) + (20*(m-1))},
 					Size = { 40, 18 },
 				}
 			end
@@ -654,9 +745,18 @@ local layout, graphics = {},{}
 			for b=1,e do
 				layout["Join_Output_" .. a .. "_Input_" .. b] =
 				{
-					PrettyName = string.format("Join~Output_%i__Input_%i",a,b), -- The Tilde (~) creates a folder break for the Control Pin list
+					PrettyName = string.format("Join~Output_%i_Input_%i",a,b), -- The Tilde (~) creates a folder break for the Control Pin list
 					Style = "Button",
 					Position = { 60 + (40 *(a-1)), 60 + (20 *(b-1)) },
+					Size = { 40, 18 },
+				}
+			end
+			for b=1,m,1 do
+				layout["Join_Output_" .. a .. "_Multiview_" .. b] =
+				{
+					PrettyName = string.format("Join~Output_%i_Multiview_%i",a,b), -- The Tilde (~) creates a folder break for the Control Pin list
+					Style = "Button",
+					Position = { 60 + (40 *(a-1)), 90 + (20 *(b-1))+ (20*(e-1))},
 					Size = { 40, 18 },
 				}
 			end
@@ -678,15 +778,25 @@ local layout, graphics = {},{}
 			table.insert(graphics,{
 				Type = "Text",
 				Text = tostring(c),
-				Position = { 0,(20 *(c-1)) + 125 + (20 *(e))},
+				Position = { 0,(20 *(c-1)) + 130 + (20 *(e))+(20*(m))},
 				HTextAlign = "Center",
 				TextSize = 14,
 				Size = { 30, 10 },
 			})
 		end
 	end
+	for c=1,m,1 do
+		table.insert(graphics,{
+			Type = "Text",
+			Text = tostring(c),
+			Position = { 0,(20 *(c-1)) + 80+ (20 *(e))},
+			HTextAlign = "Center",
+			TextSize = 14,
+			Size = { 30, 10 },
+		})
+	end
   elseif(CurrentPage=="Setup") then
-    local i_count, j_count, k_count = props["Number of encoders"].Value, props["Number of decoders"].Value, props["Number of zones"].Value
+    local i_count, j_count, k_count,l_count = props["Number of encoders"].Value, props["Number of decoders"].Value, props["Number of zones"].Value,props["Number of multiviews"].Value
     table.insert(graphics,{
 		Type = "Text",
 		Text = "ENCODER SETUP",
@@ -776,9 +886,33 @@ local layout, graphics = {},{}
 			})
 		end
 		table.insert(graphics,{
+				Type = "Text",
+				Text = "MULTIVIEW SETUP",
+				Position = { 0, 180 + (30 * (i_count)) + (30 * (j_count))+30*(k_count)},
+				HTextAlign = "Left",
+				TextSize = 14,
+				IsBold = true,
+				Size = { 150, 40 },
+			})
+		for i=1,l_count do
+			layout["multiviewNames"..tostring(l_count==1 and "" or " "..i)] =
+			{
+				PrettyName = string.format("Multiview~%i",i), -- The Tilde (~) creates a folder break for the Control Pin list
+				Style = "Text",
+				Position = { 100, 220 + (30 * (i_count)) + (30 * (j_count)) +30*(k_count)+ (30 *(i-1))},
+				Size = { 128, 20 },
+			}
+			table.insert(graphics,{
+				Type = "Text",
+				Text = "Multiview " .. i .. " Name:",
+				Position = { 0, 220 + (30 * (i_count)) + (30 * (j_count)) +30*(k_count)+ (30 *(i-1))},
+				Size = { 100, 20 },
+			})
+		end
+		table.insert(graphics,{
 			Type = "Text",
 			Text = "DEVICE STATUS",
-			Position = { 0, 120 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count)) + 80},
+			Position = { 0, 160 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count))+ (30 *(l_count)) + 80},
 			HTextAlign = "Left",
 			TextSize = 14,
 			IsBold = true,
@@ -789,7 +923,7 @@ local layout, graphics = {},{}
 		  PrettyName = "Device Status",
 		  Color = White,
 		  Style = "Textbox",
-		  Position = { 0, 160 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count)) + 80},
+		  Position = { 0, 200 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count))+ (30 *(l_count)) + 80},
 		  Size = { 230, 20 },
 		  TextBoxStyle = "Normal",
 		  TextFontSize = 12,
@@ -797,7 +931,7 @@ local layout, graphics = {},{}
 		table.insert(graphics,{
 			Type = "Text",
 			Text = "IP ADDRESS",
-			Position = { 0, 200 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count)) + 80},
+			Position = { 0, 240 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count))+ (30 *(l_count)) + 80},
 			HTextAlign = "Left",
 			TextSize = 14,
 			IsBold = true,
@@ -808,7 +942,7 @@ local layout, graphics = {},{}
 		  PrettyName = "IP Address",
 		  Color = White,
 		  Style = "Textbox",
-		  Position = { 0, 240 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count)) + 80},
+		  Position = { 0, 280 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count))+ (30 *(l_count)) + 80},
 		  Size = { 230, 20 },
 		  TextBoxStyle = "Normal",
 		  TextFontSize = 12,
@@ -817,7 +951,7 @@ local layout, graphics = {},{}
 		table.insert(graphics,{
 			Type = "Text",
 			Text = "PORT",
-			Position = { 0, 280 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count)) + 80},
+			Position = { 0, 320 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count))+ (30 *(l_count)) + 80},
 			HTextAlign = "Left",
 			TextSize = 14,
 			IsBold = true,
@@ -828,7 +962,7 @@ local layout, graphics = {},{}
 		  PrettyName = "Port",
 		  Color = White,
 		  Style = "Textbox",
-		  Position = { 0, 320 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count)) + 80},
+		  Position = { 0, 360 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count))+ (30 *(l_count)) + 80},
 		  Size = { 230, 20 },
 		  TextBoxStyle = "Normal",
 		  TextFontSize = 12,
@@ -839,33 +973,7 @@ local layout, graphics = {},{}
 		table.insert(graphics,{
 			Type = "Image",
 			Image = LOGO.IMAGE,
-			Position = { 270, 150 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count)) + 80},
-			Size = LOGO.SIZE
-		})
-	else
-		table.insert(graphics,{
-			Type = "Text",
-			Text = "DEVICE STATUS",
-			Position = { 0, 140 + (30 * (i_count)) + (30 * (j_count))},
-			HTextAlign = "Left",
-			TextSize = 14,
-			IsBold = true,
-			Size = { 150, 40 },
-		})
-		layout["Status"] =
-		{
-		  PrettyName = "Device Status",
-		  Color = White,
-		  Style = "Textbox",
-		  Position = { 0, 180 + (30 * (i_count)) + (30 *(j_count)) },
-		  Size = { 230, 20 },
-		  TextBoxStyle = "Normal",
-		  TextFontSize = 12,
-		}
-		table.insert(graphics,{
-			Type = "Image",
-			Image = LOGO.IMAGE,
-			Position = { 270, 150 + (30 * (i_count)) + (30 *(j_count)) },
+			Position = { 270, 150 + (30 * (i_count)) + (30 * (j_count)) + (30 *(k_count))+ (30 *(l_count)) + 80},
 			Size = LOGO.SIZE
 		})
 	end
@@ -903,6 +1011,8 @@ function ZEEVEE.INIT()
 		ZEEVEE.MAX_INPUTS = tonumber(Properties["Number of encoders"].Value)
 		ZEEVEE.MAX_OUTPUTS = tonumber(Properties["Number of decoders"].Value)
 		ZEEVEE.MAX_ZONES = tonumber(Properties["Number of zones"].Value)
+		ZEEVEE.MAX_MULTIVIEW = tonumber(Properties["Number of multiviews"].Value)
+		ZEEVEE.MAX_WINDOWS = tonumber(6)
 		ZEEVEE.ENDPOINT = "http://" .. Controls["ipAddress"].String .. ":" .. Controls["port"].String .. "/rcCmd.php"
 		ZEEVEE.POSTDATA = "username=" .. Properties["Username"].Value .. "&" .. "password=" .. Properties["Password"].Value .. "&serverSocketName=rcServerSocket&commands="
 		Controls.preset.EventHandler = function()
@@ -1088,6 +1198,40 @@ function ZEEVEE.INIT()
 				end
 			end
 		end
+
+		for multiview=1,ZEEVEE.MAX_MULTIVIEW,1 do
+			for output=1,ZEEVEE.MAX_OUTPUTS,1 do
+				if(Controls["Join_Output_"..output.."_Multiview_"..multiview] ~= nil) then
+					Controls["Join_Output_"..output.."_Multiview_"..multiview].EventHandler = function()
+						local cmd = "join something"
+						DEBUG.TX("Sending Zone Join Command: " .. cmd)
+						HttpClient.Upload {
+							Url = ZEEVEE.ENDPOINT,
+							Method = "POST",
+							Data = ZEEVEE.POSTDATA .. string.gsub(cmd," ","+"),
+							Headers = ZEEVEE.HEADERS,
+							EventHandler = ZEEVEE.PROCESS_GENERIC
+						}
+					end
+				end
+			end
+			for window=1,ZEEVEE.MAX_WINDOWS,1 do
+				if(Controls["Join_Multiview_"..multiview.."_Window_"..window] ~= nil) then
+					Controls["Join_Multiview_"..multiview.."_Window_"..window].EventHandler = function()
+						local cmd = "join something"
+						DEBUG.TX("Sending Zone Join Command: " .. cmd)
+						HttpClient.Upload {
+							Url = ZEEVEE.ENDPOINT,
+							Method = "POST",
+							Data = ZEEVEE.POSTDATA .. string.gsub(cmd," ","+"),
+							Headers = ZEEVEE.HEADERS,
+							EventHandler = ZEEVEE.PROCESS_GENERIC
+						}
+					end
+				end
+			end
+		end
+
 		if(Properties["Auto Setup"].Value == true) then
 			ZEEVEE.AUTO_SETUP()
 			ZEEVEE.AUTO_ZONE_SETUP()
