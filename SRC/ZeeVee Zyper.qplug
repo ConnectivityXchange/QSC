@@ -103,10 +103,10 @@ function GetProperties()
 		  Type = "boolean",
 		  Value = PluginInfo.devEnvironment == true and true or false
 		},
-		--[[{
+		{
 		  Name = "IP Address",
 		  Type = "string",
-		  Value = PluginInfo.devEnvironment == true and "172.16.16.118" or ""
+		  Value = PluginInfo.devEnvironment == true and "172.16.6.111" or ""
 		},
 		{
 		  Name = "Port",
@@ -114,16 +114,16 @@ function GetProperties()
 		  Min  = 1,
 		  Max = 65535,
 		  Value = 80
-		},]]--
+		},
 		{
 		  Name = "Username",
 		  Type = "string",
-		  Value = PluginInfo.devEnvironment == true and "admin" or ""
+		  Value = PluginInfo.devEnvironment == true and "QSC" or ""
 		},
 		{
 		  Name = "Password",
 		  Type = "string",
-		  Value = PluginInfo.devEnvironment == true and "admin" or ""
+		  Value = PluginInfo.devEnvironment == true and "QSCQSC" or ""
 		},
 		{
 		  Name = "Number of encoders",
@@ -1007,21 +1007,21 @@ function ZEEVEE.INIT()
 	if(string.len(Controls["ipAddress"].String) > 0) then
 		DEBUG.SET_DEBUG_PRINT(Properties["Debug Print"].Value)
 		DEBUG.FUNCTION("ZEEVEE.INIT")
-		DEBUG.FUNCTION("TEST: " .. Controls["ipAddress"].String)
+		DEBUG.FUNCTION("TEST: " .. Properties["IP Address"].Value)
 		ZEEVEE.MAX_INPUTS = tonumber(Properties["Number of encoders"].Value)
 		ZEEVEE.MAX_OUTPUTS = tonumber(Properties["Number of decoders"].Value)
 		ZEEVEE.MAX_ZONES = tonumber(Properties["Number of zones"].Value)
 		ZEEVEE.MAX_MULTIVIEW = tonumber(Properties["Number of multiviews"].Value)
 		ZEEVEE.MAX_WINDOWS = tonumber(6)
-		ZEEVEE.ENDPOINT = "http://" .. Controls["ipAddress"].String .. ":" .. Controls["port"].String .. "/rcCmd.php"
-		ZEEVEE.POSTDATA = "username=" .. Properties["Username"].Value .. "&" .. "password=" .. Properties["Password"].Value .. "&serverSocketName=rcServerSocket&commands="
+		ZEEVEE.ENDPOINT = "http://" .. Properties["IP Address"].Value .. ":" .. Controls["port"].String .. "/rcCmd.php"
+		ZEEVEE.POSTDATA = "commands=authenticate username " .. Properties["Username"].Value .. " password " .. Properties["Password"].Value .. " token none newPassword none\n"
 		Controls.preset.EventHandler = function()
 				local cmd = "run preset \"" .. Controls.preset.String .. "\""
 				DEBUG.TX("Sending run preset \"" .. Controls.preset.String .. "\"")
 				HttpClient.Upload {
 					Url = ZEEVEE.ENDPOINT,
 					Method = "POST",
-					Data = ZEEVEE.POSTDATA .. string.gsub(cmd," ","+"),
+					Data = ZEEVEE.POSTDATA .. string.gsub(cmd," ","+") .. "\n logout",
 					Headers = ZEEVEE.HEADERS,
 					EventHandler = ZEEVEE.PROCESS_GENERIC
 			  }
@@ -1204,7 +1204,7 @@ function ZEEVEE.INIT()
 				if(Controls["Join_Output_"..output.."_Multiview_"..multiview] ~= nil) then
 					Controls["Join_Output_"..output.."_Multiview_"..multiview].EventHandler = function()
 						local cmd = "join " .. Controls.multiviewNames[multiview].String .." ".. Controls.displayName[output].String .. " multiview"
-						DEBUG.TX("Sending Zone Join Command: " .. cmd)
+						DEBUG.TX("Sending Multiview Join Command: " .. cmd)
 						HttpClient.Upload {
 							Url = ZEEVEE.ENDPOINT,
 							Method = "POST",
@@ -1222,7 +1222,7 @@ function ZEEVEE.INIT()
 						local encoderName = Controls.sourceName[encoderNum].String
 						local squareToChange = "multiview " .. Controls.multiviewNames[multiview].String .. " windowNumber " .. window
 						local cmd = "set ".. squareToChange .. " " .. encoderName
-						DEBUG.TX("Sending Zone Join Command: " .. cmd)
+						DEBUG.TX("Sending Multiview Window Set Command: " .. cmd)
 						HttpClient.Upload {
 							Url = ZEEVEE.ENDPOINT,
 							Method = "POST",
@@ -1238,6 +1238,7 @@ function ZEEVEE.INIT()
 		if(Properties["Auto Setup"].Value == true) then
 			ZEEVEE.AUTO_SETUP()
 			ZEEVEE.AUTO_ZONE_SETUP()
+			ZEEVEE.AUTO_MULTIVIEW_SETUP()
 			Properties["Auto Setup"].Value = false
 		else
 			ZEEVEE.GET_DEVICE_CONFIG()
@@ -1257,6 +1258,18 @@ function ZEEVEE.AUTO_SETUP()
   }
 end
 
+function ZEEVEE.AUTO_MULTIVIEW_SETUP()
+	DEBUG.FUNCTION("ZEEVEE.AUTO_SETUP")
+	local cmd = "show multiviews status"
+	HttpClient.Upload {
+		Url = ZEEVEE.ENDPOINT,
+		Method = "POST",
+		Data = ZEEVEE.POSTDATA .. string.gsub(cmd," ","+"),
+		Headers = ZEEVEE.HEADERS,
+		EventHandler = ZEEVEE.PROCESS_AUTO_MULTIVIEW_SETUP
+  }
+end
+
 function ZEEVEE.AUTO_ZONE_SETUP()
 	DEBUG.FUNCTION("ZEEVEE.AUTO_ZONE_SETUP")
 	local cmd = "show zones"
@@ -1267,6 +1280,44 @@ function ZEEVEE.AUTO_ZONE_SETUP()
 		Headers = ZEEVEE.HEADERS,
 		EventHandler = ZEEVEE.PROCESS_AUTO_ZONE_SETUP
   }
+end
+
+function ZEEVEE.PROCESS_AUTO_MULTIVIEW_SETUP(tbl, code, data, err, headers)
+	DEBUG.FUNCTION("ZEEVEE.PROCESS_AUTO_MULTIVIEW_SETUP")
+	DEBUG.RX(string.format("RX (%s): %s",code or 0, data or ""))
+	if(code == 200) then
+		ZEEVEE.REPORT_STATUS("OK")
+		DEBUG.RX("baap")
+		local o,multiview,multiviews = rapidjson.decode(data),0,0,{}, {}
+		if(o.status == "Success") then
+			for _,response in pairs(o.responses) do
+				DEBUG.RX("beep")
+				if(response.text ~= nil) then
+					for _,device in pairs(response.text) do
+						DEBUG.RX("boop " .. device.gen.name)
+
+						if(device.gen ~= nil) then
+							multiview = multiview + 1
+							DEBUG.FUNCTION("FOUND MultiView: " .. device.gen.name)
+							table.insert(multiviews,device.gen.name)
+							if(tonumber(ZEEVEE.MAX_MULTIVIEW) > 1 and multiview <= tonumber(ZEEVEE.MAX_MULTIVIEW)) then
+								Controls["multiviewNames"][multiview].String = device.gen.name
+							else
+								Controls["multiviewNames"].String = device.gen.name
+							end						
+						end
+					end
+				end
+			end
+		else
+			DEBUG.FUNCTION("COMMAND FAILURE")
+		end
+	elseif code == 401.0 or Properties["IP Address"].Value == "" then  -- Invalid Address handler
+		ZEEVEE.REPORT_STATUS("MISSING", "Check IP Address") 
+	else
+		ZEEVEE.REPORT_STATUS("MISSING",err)
+	end
+
 end
 
 function ZEEVEE.PROCESS_AUTO_SETUP(tbl, code, data, err, headers)
@@ -1309,7 +1360,7 @@ function ZEEVEE.PROCESS_AUTO_SETUP(tbl, code, data, err, headers)
 		else
 			DEBUG.FUNCTION("COMMAND FAILURE")
 		end
-	elseif code == 401.0 or Controls["ipAddress"].String == "" then  -- Invalid Address handler
+	elseif code == 401.0 or Properties["IP Address"].Value == "" then  -- Invalid Address handler
 		ZEEVEE.REPORT_STATUS("MISSING", "Check IP Address") 
 	else
 		ZEEVEE.REPORT_STATUS("MISSING",err)
