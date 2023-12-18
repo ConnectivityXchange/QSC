@@ -106,7 +106,7 @@ function GetProperties()
 		{
 		  Name = "IP Address",
 		  Type = "string",
-		  Value = PluginInfo.devEnvironment == true and "172.16.6.111" or ""
+		  Value = PluginInfo.devEnvironment == true and "192.168.10.11" or ""
 		},
 		{
 		  Name = "Port",
@@ -1722,6 +1722,15 @@ end
 if Controls then
 	rapidjson = require("rapidjson")
 	StatusState = { OK = 0, COMPROMISED = 1, FAULT = 2, NOTPRESENT = 3, MISSING = 4, INITIALIZING = 5}  -- Status states in designer
+
+	if(string.len(Properties["IP Address"].Value) > 0) then
+		Controls["ipAddress"].String = Properties["IP Address"].Value
+	end
+	if(Properties["Port"] ~= 0 and Properties["Port"] ~= null) then
+		Controls["port"].Value = "" .. Properties["Port"].Value
+	end
+
+
 	if(string.len(Controls.port.String) == 0 or Controls.port.String == "") then
 		Controls.port.String = "80"
 	end
