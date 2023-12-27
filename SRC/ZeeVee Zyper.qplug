@@ -1567,7 +1567,7 @@ function ZEEVEE.PROCESS_CONFIG(tbl, code, data, err, headers)
 							encoderName = text.connectedEncoder.name
 						end
 						if(encoderName ~= "" and decoderName ~= "") then
-							local encoderInput, decoderOutput = 0,0
+							local encoderInput, decoderOutput, foundInput = 0,0,false
 							if( tonumber(ZEEVEE.MAX_OUTPUTS) == 1) then
 								if(Controls["displayName"].String == decoderName) then
 									if( tonumber(ZEEVEE.MAX_INPUTS) == 1) then
@@ -1580,8 +1580,21 @@ function ZEEVEE.PROCESS_CONFIG(tbl, code, data, err, headers)
 										else
 											Controls["Join_Output_1_Input_1"].Value = 0
 										end
+										if(foundInput == false) then 
+											if(Controls["multiviews"].Value == 1) then
+												if(Controls["multiviews"].String == encoderName) then
+													Controls["Join_Multiview_1"].Value = 1
+												end
+											else
+												for a=1,ZEEVEE.MAX_MULTIVIEW do
+													if(Controls["multivews"][a].String == encoderName) then
+														Controls["Join_Multiview_"..a].Value = 1
+													end
+												end
+											end
+										end
+
 									else
-										local foundInput = false
 										for a = 1, tonumber(ZEEVEE.MAX_INPUTS), 1 do
 											if(Controls["sourceName"][a].String == encoderName) then
 												encoderInput = a
@@ -1591,6 +1604,19 @@ function ZEEVEE.PROCESS_CONFIG(tbl, code, data, err, headers)
 												Controls["CurrentInput"].String = a
 											else
 												Controls["Join_Output_1_Input_" .. a].Value = 0
+											end
+										end
+										if(foundInput == false) then 
+											if(Controls["multiviews"].Value == 1) then
+												if(Controls["multiviews"].String == encoderName) then
+													Controls["Join_Multiview_1"].Value = 1
+												end
+											else
+												for a=1,ZEEVEE.MAX_MULTIVIEW do
+													if(Controls["multivews"][a].String == encoderName) then
+														Controls["Join_Multiview_"..a].Value = 1
+													end
+												end
 											end
 										end
 										if(foundInput == false) then
