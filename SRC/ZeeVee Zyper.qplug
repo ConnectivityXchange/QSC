@@ -171,7 +171,7 @@ local pagenames = {
 }
 
 function GetPages()
-	pages = {}
+	local pages = {}
 	for ix,name in ipairs(pagenames) do
 		table.insert( pages, { name = pagenames[ix] })
 	end
@@ -1216,12 +1216,13 @@ function ZEEVEE.INIT()
 				end
 			end
 			for window=1,ZEEVEE.MAX_WINDOWS,1 do
-				if(Controls["Join_Multiview_"..multiview.."_Window_"..window] ~= nil) then
-					Controls["Join_Multiview_"..multiview.."_Window_"..window].EventHandler = function()
-						local encoderNum = Controls["Join_Multiview_"..multiview.."_Window_"..window].Value
-						local encoderName = Controls.sourceName[encoderNum].String
+				local location = "Join_Multiview_"..multiview.."_Window_"..window
+				if(Controls[location] ~= nil) then
+					Controls[location].EventHandler = function()
+						local encoderNum = Controls[location].String
+						local encoderName = Controls.sourceName[tonumber(encoderNum)].String
 						local squareToChange = "multiview " .. Controls.multiviewNames[multiview].String .. " windowNumber " .. window
-						local cmd = "set ".. squareToChange .. " " .. encoderName
+						local cmd = "set ".. squareToChange .. " newEncoderName " .. encoderName
 						DEBUG.TX("Sending Multiview Window Set Command: " .. cmd)
 						HttpClient.Upload {
 							Url = ZEEVEE.ENDPOINT,
@@ -1287,15 +1288,12 @@ function ZEEVEE.PROCESS_AUTO_MULTIVIEW_SETUP(tbl, code, data, err, headers)
 	DEBUG.RX(string.format("RX (%s): %s",code or 0, data or ""))
 	if(code == 200) then
 		ZEEVEE.REPORT_STATUS("OK")
-		DEBUG.RX("baap")
 		local o,multiview = rapidjson.decode(data),0
 		local multiviews = {}
 		if(o.status == "Success") then
 			for _,response in pairs(o.responses) do
-				DEBUG.RX("beep")
 				if(response.text ~= nil) then
 					for _,device in pairs(response.text) do
-						DEBUG.RX("boop " .. device.gen.name)
 
 						if(device.gen ~= nil) then
 							multiview = multiview + 1
@@ -1404,7 +1402,7 @@ end
 
 function ZEEVEE.PROCESS_SUB_ZONE_SETUP(zones,zone,device,deviceName)
 	DEBUG.FUNCTION("ZEEVEE.PROCESS_SUB_ZONE_SETUP")
-	DEBUG.FUNCTION(zone,device,deviceName)
+	--DEBUG.FUNCTION(zone,device,deviceName)
 	for zoneName,zoneTable in pairs(device) do
 		if(zoneName ~= "gen" and zoneName ~= "displays") then
 			zone = zone + 1
@@ -1432,38 +1430,49 @@ end
 function ZEEVEE.PROCESS_MULTIVIEWS_STATUS(tbl, code, data, err, headers)
 	DEBUG.FUNCTION("ZEEVEE.PROCESS_MULTIVIEWS_STATUS")
 	DEBUG.RX(string.format("RX (%s): %s",code or 0, data or ""))
+	local o
+	local mvNames = {}
+	local mvCount = 0
 	if(code == 200) then
 		ZEEVEE.REPORT_STATUS("OK")
-		local o = rapidjson.decode(data)
-		local mvNames = {}
-		local mvWindows = {}
-		if(o.status == "Success") then
-			for _,response in pairs(o.responses) do
-				if(response.text ~= nil) then
-					for _,text in pairs(response.text) do
-						if(text.gen ~= nil) then
-							if(text.gen.name ~= nil) then
-								table.insert(mvNames,text.gen.name)
-								local tempWindow = {}
-								for _,win in pairs(text.window) do
-									table.insert(tempWindow,win.encoderName)
+		o = rapidjson.decode(data)
+		if(o.status ~= "Success") then 
+			ZEEVEE.REPORT_STATUS("Unsuccessful",err)
+			return
+		end
+	elseif code == 401.0 or Controls["ipAddress"].String == "" then  -- Invalid Address handler
+		ZEEVEE.REPORT_STATUS("MISSING", "Check IP Address") 
+		return
+	else
+		ZEEVEE.REPORT_STATUS("MISSING",err)
+		return
+	end
+	
+	for _,response in pairs(o.responses) do
+		if(response.text ~= nil) then
+			for _,text in pairs(response.text) do
+				if(text.gen ~= nil) then
+					if(text.gen.name ~= nil) then
+						table.insert(mvNames,text.gen.name)
+						mvCount = mvCount + 1
+						windowIndex = 0
+						for _,window in pairs(text.window) do
+							windowIndex = windowIndex + 1
+							Controls["Join_Multiview_"..mvCount.."_Window_".. windowIndex ].String = 0
+							for input=1,ZEEVEE.MAX_INPUTS do
+								if window.encoderName == Controls["sourceName"][input].String then
+									Controls["Join_Multiview_"..mvCount.."_Window_".. windowIndex ].String = input
 								end
-								table.insert(mvWindows,tempWindow)
 							end
 						end
 					end
 				end
 			end
 		end
-		Controls["multiviewNames"].Choices = mvNames
-		DEBUG.RX(mvNames)
-		DEBUG.RX(mvWindows)
-		ZEEVEE.GET_DEVICE_CONFIG()
-	elseif code == 401.0 or Controls["ipAddress"].String == "" then  -- Invalid Address handler
-		ZEEVEE.REPORT_STATUS("MISSING", "Check IP Address") 
-	else
-		ZEEVEE.REPORT_STATUS("MISSING",err)
 	end
+	Controls["multiviewNames"].Choices = mvNames
+	ZEEVEE.GET_DEVICE_CONFIG()
+	return
 end
 
 function ZEEVEE.SHOW_VIDEO_WALLS()
@@ -1561,207 +1570,102 @@ end
 function ZEEVEE.PROCESS_CONFIG(tbl, code, data, err, headers)
 	DEBUG.FUNCTION("ZEEVEE.PROCESS_CONFIG")
 	DEBUG.RX(string.format("RX (%s): %s",code or 0, data or ""))
+	local o = rapidjson.decode(data)
 	if(code == 200) then
 		ZEEVEE.REPORT_STATUS("OK")
-		local o = rapidjson.decode(data)
-		if(o.status == "Success") then
-			for _,response in pairs(o.responses) do
-				if(response.text ~= nil) then
-					for _,text in pairs(response.text) do
-						local decoderName, encoderName = "",""
-						if(text.gen ~= nil) then
-							decoderName = text.gen.name
-						end
-						if(text.connectedEncoder ~= nil) then
-							encoderName = text.connectedEncoder.name
-						end
-						if(encoderName ~= "" and decoderName ~= "") then
-							local encoderInput, decoderOutput, foundInput = 0,0,false
-							if( tonumber(ZEEVEE.MAX_OUTPUTS) == 1) then
-								if(Controls["displayName"].String == decoderName) then
-									if( tonumber(ZEEVEE.MAX_INPUTS) == 1) then
-										if(Controls["sourceName"].String == encoderName) then
-											encoderInput = 1
-											DEBUG.FUNCTION("Setting output " .. 1 .. "(" .. decoderName .. ")" .. " to input " .. encoderInput .. " (" .. encoderName .. ")")
-											Controls["Join_Output_1_Input_1"].Value = 1
-											foundInput = true
-											Controls["CurrentInput"].String = 1
-										else
-											Controls["Join_Output_1_Input_1"].Value = 0
-										end
-										if(foundInput == false) then 
-											if(Controls["multiviewNames"].Value == 1) then
-												if(Controls["multiviewNames"].String == encoderName) then
-													Controls["Join_Output_1_Multiview_1"].Value = 1
-												else
-													Controls["Join_Output_1_Multiview_1"].Value = 0
-												end
-											else
-												for a=1,ZEEVEE.MAX_MULTIVIEW do
-													if(Controls["multivews"][a].String == encoderName) then
-														Controls["Join_Output_1_Multiview_"..a].Value = 1
-													else
-														Controls["Join_Output_1_Multiview_"..a].Value = 0
-													end
-												end
-											end
-										end
+		if(o.status ~= "Success") then
+			DEBUG.FUNCTION("COMMAND FAILURE")
+			return
+		end
+	elseif code == 401.0 or Controls["ipAddress"].String == "" then  -- Invalid Address handler
+		ZEEVEE.REPORT_STATUS("MISSING", "Check IP Address")
+		return
+	else
+		ZEEVEE.REPORT_STATUS("MISSING",err)
+		return
+	end
+	
+	for _,response in pairs(o.responses) do
+		if(response.text ~= nil) then
+			for _,text in pairs(response.text) do
+				local decoderName, encoderName = "",""
+				if(text.gen ~= nil) then
+					decoderName = text.gen.name
+				end
+				if(text.connectedEncoder ~= nil) then
+					encoderName = text.connectedEncoder.name
+				end
+				if(encoderName == "" or decoderName == "") then return end
 
-									else
-										for a = 1, tonumber(ZEEVEE.MAX_INPUTS), 1 do
-											if(Controls["sourceName"][a].String == encoderName) then
-												encoderInput = a
-												DEBUG.FUNCTION("Setting output " .. 1 .. "(" .. decoderName .. ")" .. " to input " .. encoderInput .. " (" .. encoderName .. ")")
-												Controls["Join_Output_1_Input_" .. a].Value = 1
-												foundInput = true
-												Controls["CurrentInput"].String = a
-											else
-												Controls["Join_Output_1_Input_" .. a].Value = 0
-											end
-										end
-										if(foundInput == false) then 
-											if(Controls["multiviewNames"].Value == 1) then
-												if(Controls["multiviewNames"].String == encoderName) then
-													Controls["Join_Output_1_Multiview_1"].Value = 1
-													foundInput = true
-												else
-													Controls["Join_Output_1_Multiview_1"].Value = 0
-												end
-											else
-												for a=1,ZEEVEE.MAX_MULTIVIEW do
-													if(Controls["multivews"][a].String == encoderName) then
-														Controls["Join_Output_1_Multiview_"..a].Value = 1
-														foundInput = true
-													else
-														Controls["Join_Output_1_Multiview_"..a].Value = 0
-													end
-												end
-											end
-										end
-										if(foundInput == false) then
-											DEBUG.FUNCTION("Setting output " .. b .. "(" .. decoderName .. ")" .. " to disconnected")
-											Controls["CurrentInput"].String = 0
-										end
-									end
+				local encoderInput, decoderOutput, foundInput = 0,0,false
+				if( tonumber(ZEEVEE.MAX_OUTPUTS) == 1) then
+					if(Controls["displayName"].String == decoderName) then
+						for a = 1, tonumber(ZEEVEE.MAX_INPUTS) do
+							if(ZEEVEE.PROCESS_SUB_INPUT(a,1,encoderName)) then foundInput = true end
+						end
+						if(foundInput == false) then 
+							for a = 1, tonumber(ZEEVEE.MAX_MULTIVIEW) do
+								foundInput = ZEEVEE.PROCESS_SUB_MULTIVIEW(a,1,encoderName)
+							end
+						end
+						
+						if(foundInput == false) then
+							DEBUG.FUNCTION("Setting output 1(" .. decoderName .. ")" .. " to disconnected")
+							Controls["CurrentInput"].String = 0
+						end
+					end
+				else
+					for b = 1, tonumber(ZEEVEE.MAX_OUTPUTS), 1 do
+						
+						if(Controls["displayName"][b].String == decoderName) then
+							
+							for a = 1, tonumber(ZEEVEE.MAX_INPUTS), 1 do
+								if(ZEEVEE.PROCESS_SUB_INPUT(a,b,encoderName)) then foundInput = true end
+							end
+							
+							if(foundInput == false) then 
+								for a = 1,ZEEVEE.MAX_MULTIVIEW do
+									if(ZEEVEE.PROCESS_SUB_MULTIVIEW(a,b,encoderName)) then foundInput = true end
 								end
-							else
-								for b = 1, tonumber(ZEEVEE.MAX_OUTPUTS), 1 do
-									if(Controls["displayName"][b].String == decoderName) then
-										if( tonumber(ZEEVEE.MAX_INPUTS) == 1) then
-											if(Controls["sourceName"].String == encoderName) then
-												encoderInput = 1
-												DEBUG.FUNCTION("Setting output " .. b .. "(" .. decoderName .. ")" .. " to input " .. encoderInput .. " (" .. encoderName .. ")")
-												Controls["Join_Output_" .. b .. "_Input_1"].Value = 1
-												foundInput = true
-												if(tonumber(ZEEVEE.MAX_OUTPUTS) > 1) then
-													Controls["CurrentInput"][b].String = 1
-												else
-													Controls["CurrentInput"].String = 1
-												end
-											else
-												Controls["Join_Output_" .. b .. "_Input_1"].Value = 0
-											end
-											if(foundInput == false) then 
-												if(Controls["multiviewNames"].Value == 1) then
-													if(Controls["multiviewNames"].String == encoderName) then
-														Controls["Join_Output_"..b.."_Multiview_1"].Value = 1
-														foundInput = true
-														if(tonumber(ZEEVEE.MAX_OUTPUTS) > 1) then
-															Controls["CurrentInput"][b].String = "M1"
-														else
-															Controls["CurrentInput"].String = "M1"
-														end
-													else
-														Controls["Join_Output_"..b.."_Multiview_1"].Value = 0
-													end
-												else
-													for a=1,ZEEVEE.MAX_MULTIVIEW do
-														if(Controls["multivews"][a].String == encoderName) then
-															Controls["Join_Output_"..b.."_Multiview_"..a].Value = 1
-															foundInput = true
-															
-															if(tonumber(ZEEVEE.MAX_OUTPUTS) > 1) then
-																Controls["CurrentInput"][b].String = "M"..a
-															else
-																Controls["CurrentInput"].String = "M"..a
-															end
-														else
-															Controls["Join_Output_"..b.."_Multiview_"..a].Value = 0
-														end
-													end
-												end
-											end
-										else
-											for a = 1, tonumber(ZEEVEE.MAX_INPUTS), 1 do
-												if(Controls["sourceName"][a].String == encoderName) then
-													encoderInput = a
-													DEBUG.FUNCTION("Setting output " .. b .. " (" .. decoderName .. ")" .. " to input " .. encoderInput .. " (" .. encoderName .. ")")
-													if(Properties["Draw Router"].Value == "True") then Controls["Join_Output_" .. b .. "_Input_" .. a].Value = 1 end
-													foundInput = true
-													if(tonumber(ZEEVEE.MAX_OUTPUTS) > 1) then
-														Controls["CurrentInput"][b].String = a
-													else
-														Controls["CurrentInput"].String = a
-													end
-												else
-													if(Properties["Draw Router"].Value == "True") then Controls["Join_Output_" .. b .. "_Input_" .. a].Value = 0 end
-												end
-											end
-											
-											if(foundInput == false) then 
-												if(Controls["multiviewNames"].Value == 1) then
-													if(Controls["multiviewNames"].String == encoderName) then
-														Controls["Join_Output_"..b.."_Multiview_1"].Value = 1
-														foundInput = true
-														if(tonumber(ZEEVEE.MAX_OUTPUTS) > 1) then
-															Controls["CurrentInput"][b].String = "M1"
-														else
-															Controls["CurrentInput"].String = "M1"
-														end
-													else
-														Controls["Join_Output_"..b.."_Multiview_1"].Value = 0
-													end
-												else
-													for a=1,ZEEVEE.MAX_MULTIVIEW do
-														if(Controls["multiviewNames"][a].String == encoderName) then
-															Controls["Join_Output_"..b.."_Multiview_"..a].Value = 1
-															foundInput = true
-															
-															if(tonumber(ZEEVEE.MAX_OUTPUTS) > 1) then
-																Controls["CurrentInput"][b].String = "M"..a
-															else
-																Controls["CurrentInput"].String = "M"..a
-															end
-														else
-															Controls["Join_Output_"..b.."_Multiview_"..a].Value = 0
-														end
-													end
-												end
-											end
-											if(foundInput == false) then
-												DEBUG.FUNCTION("Setting output " .. b .. "(" .. decoderName .. ")" .. " to disconnected")
-												if(tonumber(ZEEVEE.MAX_OUTPUTS) > 1) then
-													Controls["CurrentInput"][b].String = 0
-												else
-													Controls["CurrentInput"].String = 0
-												end
-											end
-										end
-									end
-								end
+							end
+							if(foundInput == false) then
+								DEBUG.FUNCTION("Setting output " .. b .. "(" .. decoderName .. ")" .. " to disconnected")
+								Controls["CurrentInput"][b].String = 0
 							end
 						end
 					end
 				end
 			end
-		else
-			DEBUG.FUNCTION("COMMAND FAILURE")
 		end
-	elseif code == 401.0 or Controls["ipAddress"].String == "" then  -- Invalid Address handler
-		ZEEVEE.REPORT_STATUS("MISSING", "Check IP Address") 
-	else
-		ZEEVEE.REPORT_STATUS("MISSING",err)
 	end
+end
+
+function ZEEVEE.PROCESS_SUB_INPUT(input,output,encoderName)
+	local flag = 0
+	if(ZEEVEE.MAX_INPUTS == 1) then
+		flag = (Controls["sourceName"].String == encoderName)
+		Controls["CurrentInput"].String = flag and 1 or 0
+	else
+		flag = (Controls["sourceName"][input].String == encoderName)
+		if(flag) then Controls["CurrentInput"][b].String = input end
+	end
+	Controls["Join_Output_"..output.."_Input_"..input].Value = flag
+	return flag
+end
+
+function ZEEVEE.PROCESS_SUB_MULTIVIEW(input, output, encoderName)
+	local flag = 0
+	if(ZEEVEE.MAX_MULTIVIEW == 1) then
+		flag = (Controls["multiviewNames"].String == encoderName) and 1 or 0
+		if(flag) then
+			Controls["CurrentInput"].String = "M"..input
+		end
+	else
+		flag = (Controls["multiviewNames"][input].String == encoderName) and 1 or 0
+		Controls["CurrentInput"][input].String = "M"..input
+	end
+	Controls["Join_Output_"..output.."_Multiview_"..input].Value = flag
+	return flag
 end
 
 function ZEEVEE.REPORT_STATUS(state, msg)
