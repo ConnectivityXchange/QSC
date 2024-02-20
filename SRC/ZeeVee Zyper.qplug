@@ -22,10 +22,10 @@ COLOR = {
 
 PluginInfo =
 {
-  Name = "ZeeVee~Zyper Management Platform Plugin",
-  Version = "1.3",
-  BuildVersion = "0.0.0.1",
-  Id = "8111977b-91d9-4ef4-8c51-e57ca99c67ef",
+  Name = "ZeeVee~Zyper with Multiview",
+  Version = "1.4",
+  BuildVersion = "0.0.0.2",
+  Id = "8111977b-91d9-4ef4-8c51-e57ca99c67eg",
   Description = "Plugin to interface ZeeVee Zyper Management Platform running Firmware Version 2.0 and above",
   IsManaged = true,
   Manufacturer = "ZeeVee",
@@ -1597,40 +1597,26 @@ function ZEEVEE.PROCESS_CONFIG(tbl, code, data, err, headers)
 				end
 				if(encoderName == "" or decoderName == "") then return end
 
-				local encoderInput, decoderOutput, foundInput = 0,0,false
 				if( tonumber(ZEEVEE.MAX_OUTPUTS) == 1) then
 					if(Controls["displayName"].String == decoderName) then
-						for a = 1, tonumber(ZEEVEE.MAX_INPUTS) do
-							if(ZEEVEE.PROCESS_SUB_INPUT(a,1,encoderName)) then foundInput = true end
+						Controls["CurrentInput"].String = 0
+						for a = 1, ZEEVEE.MAX_INPUTS do
+							ZEEVEE.PROCESS_SUB_INPUT(a,1,encoderName)
 						end
-						if(foundInput == false) then 
-							for a = 1, tonumber(ZEEVEE.MAX_MULTIVIEW) do
-								foundInput = ZEEVEE.PROCESS_SUB_MULTIVIEW(a,1,encoderName)
-							end
-						end
-						
-						if(foundInput == false) then
-							DEBUG.FUNCTION("Setting output 1(" .. decoderName .. ")" .. " to disconnected")
-							Controls["CurrentInput"].String = 0
+						for a = 1, ZEEVEE.MAX_MULTIVIEW do
+							ZEEVEE.PROCESS_SUB_MULTIVIEW(a,1,encoderName)
 						end
 					end
 				else
-					for b = 1, tonumber(ZEEVEE.MAX_OUTPUTS), 1 do
-						
+					for b = 1, ZEEVEE.MAX_OUTPUTS do
 						if(Controls["displayName"][b].String == decoderName) then
-							
-							for a = 1, tonumber(ZEEVEE.MAX_INPUTS), 1 do
-								if(ZEEVEE.PROCESS_SUB_INPUT(a,b,encoderName)) then foundInput = true end
+							Controls["CurrentInput"][b].String = 0
+							for a = 1, ZEEVEE.MAX_INPUTS do
+								ZEEVEE.PROCESS_SUB_INPUT(a,b,encoderName)
 							end
 							
-							if(foundInput == false) then 
-								for a = 1,ZEEVEE.MAX_MULTIVIEW do
-									if(ZEEVEE.PROCESS_SUB_MULTIVIEW(a,b,encoderName)) then foundInput = true end
-								end
-							end
-							if(foundInput == false) then
-								DEBUG.FUNCTION("Setting output " .. b .. "(" .. decoderName .. ")" .. " to disconnected")
-								Controls["CurrentInput"][b].String = 0
+							for a = 1,ZEEVEE.MAX_MULTIVIEW do
+								ZEEVEE.PROCESS_SUB_MULTIVIEW(a,b,encoderName)
 							end
 						end
 					end
@@ -1640,6 +1626,7 @@ function ZEEVEE.PROCESS_CONFIG(tbl, code, data, err, headers)
 	end
 end
 
+
 function ZEEVEE.PROCESS_SUB_INPUT(input,output,encoderName)
 	local flag = 0
 	if(ZEEVEE.MAX_INPUTS == 1) then
@@ -1647,7 +1634,10 @@ function ZEEVEE.PROCESS_SUB_INPUT(input,output,encoderName)
 		Controls["CurrentInput"].String = flag and 1 or 0
 	else
 		flag = (Controls["sourceName"][input].String == encoderName)
-		if(flag) then Controls["CurrentInput"][b].String = input end
+		if(flag) then 
+			Controls["CurrentInput"][output].String = tostring(input)
+			print("Found output "..output.." input "..input)
+		end
 	end
 	Controls["Join_Output_"..output.."_Input_"..input].Value = flag
 	return flag
@@ -1661,8 +1651,11 @@ function ZEEVEE.PROCESS_SUB_MULTIVIEW(input, output, encoderName)
 			Controls["CurrentInput"].String = "M"..input
 		end
 	else
-		flag = (Controls["multiviewNames"][input].String == encoderName) and 1 or 0
-		Controls["CurrentInput"][input].String = "M"..input
+		flag = (Controls["multiviewNames"][input].String == encoderName)
+		if(flag) then
+			Controls["CurrentInput"][output].String = "M"..input
+			print("Found output "..output.." multiview "..input)
+		end
 	end
 	Controls["Join_Output_"..output.."_Multiview_"..input].Value = flag
 	return flag
